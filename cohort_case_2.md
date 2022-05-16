@@ -1,5 +1,5 @@
 # 코호트 분석 케이스 2
-- https://alex-blog.tistory.com/entry/pythoncohort
+
 - 코호트 분석 지표를 사용하는 방식은 회사마다 다르다.
 
 ### 코호트 분석
@@ -309,4 +309,7 @@ plt.show() ;
 ```
 
 ![cohort_case_2_12.png](./images/cohort_case_2_12.png)
+
+### 참고 사이트
+- https://alex-blog.tistory.com/entry/pythoncohort
 
