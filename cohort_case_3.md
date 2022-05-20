@@ -1,7 +1,6 @@
 # 코호트 분석 케이스 3
 
 ## step-by-step introduction to cohort Analysis in python
-- https://towardsdatascience.com/a-step-by-step-introduction-to-cohort-analysis-in-python-a2cbbd8460ea
 - 고객의 행동을 더 잘 이해하기 위해 코호트 분석을 수행한다.
 - 동질 집단 분석은 고객, 사용자의 행동에 대한 통찰을 얻는데 도움이 되는 유용하고 비교적 간단한 기술이다.
 - 분석을 위해서 전환(conversion), 유지(retention), 수익 생성(generated revenue) 등 다양한 메트릭을 사용할 수 있다. 
@@ -435,3 +434,7 @@ plt.show() ;
 ```
 
 ![cohort_case_3_18.png](./images/cohort_case_3_18.png)
+
+
+### 참고
+- https://towardsdatascience.com/a-step-by-step-introduction-to-cohort-analysis-in-python-a2cbbd8460ea
