@@ -269,18 +269,24 @@ df22[df22["Customer_ID"] == top_order["Customer_ID"]]
     - acq_month : 고객 별 최초 주문 날짜 : cohort_month
 
 #### tx_month
-- 주문한 날짜의 월을 만들고, 날을 1일로 통일
-- tx_month에서 최소값이 코호트 그룹의 기준이 되므로, 날짜를 1일로 통일하고 월을 비교하기위한 것 같다.
+- 주문한 날짜의 월을 만들고, 날을 1일로 만든다.
     - 2016-02-08 -> 2016-02-01
-- 날짜가 다 다르다면 최소값이 달라지기 때문
+    - 2016-02-15 -> 2016-02-01
+- 고객별 tx_month에서 최소값이 코호트 그룹의 기준이 된다.
+    - 2016-03-01, 2016-05-01, 2016-06-01 -> 2016-03-01 이 최소값이 된다.
+    - acq_month
+- 날짜를 1일로 통일하고 "월"을 비교하기위한 것 같다.
+- 구매 날짜가 다 다르다면 최소값이 달라지기 때문
 - 월별로 코호트 그룹을 생성하는 것과 같은 의미이다.
 
 #### acq_month
-- tx_month의 최소값
-- 즉 첫 주문한 날짜의 월 초
-    - 2022-05-24, 2022-06-01 주문 했다면 tx_month는 2022-05-01, 2022-06-01 이고, acq_month는 2022-05-01이 된다.
-- 일자를 통일해서 월별로 코호트 그룹화한다. 
-- cohort_month와 같은 의미이다. 
+- 고객별 tx_month의 최소값
+- 즉 첫 주문한 달의 1일 값
+    - A고객이 2022-05-24, 2022-06-01 주문 했다면
+    - tx_month는 2022-05-01, 2022-06-01 이고,
+    - acq_month는 2022-05-01이 된다.
+- 일자를 통일해서 월별로 코호트 그룹화한다.
+- cohort_month와 같은 의미이다.
 
 #### 주문한 월 데이터 생성
 - tx_month
@@ -348,6 +354,11 @@ df22.head(3)
 
 ![cohort_case_4_9.png](./images/cohort_case_4_9.png)
 
+#### tx_month와 acq_month의 차이
+- tx_month와 acq_month의 차이가 cohort period와 같은 의미이다.
+- 주문건별 서로다른 월과 최초 구매한 월의 차이
+- 1월에 첫 주문하고 2월에 다음 주문을 했다는 의미 즉 retention이 발생했다는 것
+
 ### 5-1. 10회 주문한 고객의 주문 현황 분석
 - 14845 고객의 주문 현황
 - 총 몇개를 주문했나?
@@ -384,35 +395,353 @@ customer_14845
 
 ![cohort_case_4_10.png](./images/cohort_case_4_10.png)
 
+#### 14845 고객이 주문한 수량, 구매 금액
+
+```python
+customer_14845.groupby("Customer_ID").agg({"Quantity" : sum, "Sales_Amount" : sum})
+```
+![cohort_case_4_11.png](./images/cohort_case_4_11.png)
+
+#### 많이 주문한 품목은?
+- origin_df 에서 조회해야 한다.
+   - 주문일 당 하나의 주문건만 남겼기 때문
+
+```python
+customer_14845["SKU_Category"].value_counts()
+
+>>> print
+
+J4R    3
+R6E    1
+JPI    1
+LPF    1
+LSD    1
+7C6    1
+U5F    1
+FEW    1
+Name: SKU_Category, dtype: int64
+```
+#### 10번 서로다른 날에 주문한 고객 10명의 주문현황
+- 주문건수가 10번이 아니라, 10일
+- 여러개의 인덱스, 항목 등을 동시에 필터링하는 방법
+- df["컬럼"].isin([a, b, c]) : a, b, c를 만족하는 데이터 필터링
+- ~df["컬럼"].isin([a, b, c]) : a, b, c를 제외한 데이터 필터링, 앞에 ~ 표시 붙이기 
+
+```python
+n_order_10 = test[:10].index
+n_order_10
+
+>>> print
+
+Int64Index([1660, 1710, 1665, 1685, 17471, 15685, 9048, 15491, 2186, 1694], dtype='int64')
+```
+
+```python
+order_10days = df22[df22["Customer_ID"].isin(n_order_10)]
+order_10days.head()
+```
+![cohort_case_4_12.png](./images/cohort_case_4_12.png)
+
+#### 서로다른 10일 간 주문한 고객 10명의 주문현황 요약
+- 가장 구매금액이 큰 고객은 17471
+
+```python
+order_10days_tabel = order_10days.groupby("Customer_ID") \
+.agg({"Quantity" : sum, "Sales_Amount" : sum, "Date" : pd.Series.nunique}) \
+.sort_values("Sales_Amount", ascending=False)
+
+order_10days_tabel
+```
+![cohort_case_4_13.png](./images/cohort_case_4_13.png)
+
+#### 고객별 구매 수량을 그래프로 확인
+- 고객 그룹의 아이디를 리스트에 담는다.
+
+```python
+idx_lst = [str(a) for a in order_10days_tabel.index]
+idx_lst
+
+>>> print
+
+['17471',
+ '1665',
+ '15685',
+ '1660',
+ '1685',
+ '1710',
+ '1694',
+ '2186',
+ '9048',
+ '15491']
+```
+
+- ploting
+
+```python
+plt.figure(figsize=(8, 6))
+plt.bar(idx_lst,  order_10days_tabel["Quantity"], width=0.7)
+plt.xlabel("# of customerID")
+plt.ylabel("Quantity")
+plt.show() ; 
+```
+![cohort_case_4_14.png](./images/cohort_case_4_14.png)
+
+#### 서로 다른 10일간 주문한 고객들이 가장 많이 산 제품을 그래프로 확인
+- 많이 구매한 상품 카테고리 조회
+
+```python
+top_cate = order_10days["SKU_Category"].value_counts()[:20]
+top_cate
+
+>>> print
+
+XG4    67
+R6E    44
+N8U    40
+P42    31
+JPI    28
+Q4N    23
+H15    22
+Z4O    17
+X52    17
+0H2    17
+DJI    16
+DGB    14
+TW8    14
+H1H    13
+N5F    12
+SIM    12
+SFC    11
+2ML    10
+TVL     9
+FEW     9
+Name: SKU_Category, dtype: int64
+```
+
+- ploting
+
+```python
+plt.figure(figsize=(17, 9))
+sns.barplot(x=top_cate.values, y=top_cate.index, palette="tab20c_r")
+sns.set_context("talk")
+plt.xticks(np.arange(0, 66, 5))
+plt.xlabel("Amount", y=1.05)
+plt.ylabel("Product")
+plt.title("Most selling 20 products", fontsize=20, y=1.05)
+plt.show() ;
+```
+![cohort_case_4_15.png](./images/cohort_case_4_15.png)
+
+### 6. cohort index
+- cohort period 와 같다.
+- tx_month와 acq_month 의 차이 + 1
+    - 0부터 시작하지 않고 1부터 시작하도록 한다. 
+- 즉 고객별 처음 구매한 월로부터 각각의 구매 시점의 월과의 차이
+    - 처음 구매월이 2016-03 인경우 어떤 구매시점이 2016-05라면 차이는 3이된다.
+    - 이 값이 리텐션 기간의 기준이 된다.
+
+#### 시계열 데이터 연산 함수 만들기
+
+```python
+def diff_month(x) :
+    d1 = x["tx_month"]
+    d2 = x["acq_month"]
+
+    return ((d1.year - d2.year) * 12 + (d1.month - d2.month))  + 1
+```
+
+#### cohort idx 생성
+- cohort period
+
+```python
+df22["cohort_idx"] = df22.apply(lambda x : diff_month(x), axis=1)
+df22.head()
+```
+![cohort_case_4_16.png](./images/cohort_case_4_16.png)
+
+### 6-1. 시계열의 연산에서 attrgetter 메서드를 사용하려면
+- 최초 구매일과 다음 구매일의 차이를 계산하기 위한 방법 중 하나.
+
+#### 시계열 데이터 변환 시
+- dt.to_period()를 사용하면 자료형이 period[]가 된다.
+   - 같은 period[] 타입 끼리 연산을 한 후 attrgetter("n")을 사용하여 차이값을 반환할 수 있다.
+- dt.strftime()을 사용하면 자료형이 object(문자열)가 된다.
+   - 이 경우는 직접 연산을 할 수 없다.
+   - attrgetter()를 사용할 수 없다.
+
+### 7. retention rates
+- get_cohort_matrix() 함수를 만들고, 절대값과 비율을 반환한다.
+    - cd : 첫 구매월별 코호트 기간별(다음 구매일) 고객의 수를 계산
+       - 2016-01-01에 처음 구매한 사람 중 다음 구매일이 1달후 인 고객, 2달 후인 고객의 갯수
+       - cohort_period의 값은 +1 이 된 값이므로, 1이면 첫달의 구매한 것, 2이면 한달 후에 재구매 한 것으로 볼 수 있다.
+    - cc : pivot_table : 처음 구매일로부터 다음 구매월별 고객 수 피봇테이블
+    - cs : 처음 구매한 달의 구매 고객 수
+    - retention : 월별 코호트당 비율
+       - 처음 구매한 월의 데이터를 행 기준으로 나누어준다. 
+
+### 7-1. 코호트 매트릭스를 반환하는 함수
+- 코호트 매트릭스를 피벗테이블 형태로 반환해 준다.
+- 리텐션 값을 계산할 기준이 되는 컬럼을 함수의 파라미터 값으로 변경하여 조회할 수 있다.
+- 그룹연산 값을 변경하여 조회할 수 있다.
+
+```python
+def get_cohort_matrix(data, var="Customer_ID", func=pd.Series.nunique) :
+    cd = data.groupby(["acq_month", "cohort_idx"])[var].apply(func).reset_index()
+    cc = cd.pivot_table(index="acq_month",
+                       columns="cohort_idx",
+                       values=var)
+    cs = cc.iloc[:, 0]
+    retention = cc.divide(cs, axis=0)
+    retention = retention.round(3) * 100
+
+    return cc, retention
+```
+
+### 7-2. 고객의 주문건수에 대한 코호트 분석
+- customerid 별 주문건수
+- cc 는 고객별 첫 구매월을 기준으로 코호트 기간 별 주문건수를 카운팅한 값을 조회한 것과 같다.
+- 2016-01월에 처음 구매한 고객은 다음 구매월인 2월에 주문건수가 줄었다.
+    - 3396 -> 1306
+    - 즉 1월에 처음 구매한 사람들의 재구매율이 낮다.
+
+```python
+cc, retention = get_cohort_matrix(df22)
+cc
+```
+![cohort_case_4_17.png](./images/cohort_case_4_17.png)
+
+- retention : 기준 데이터를 각 컬럼별로 나누어 준 값
+    - 즉 어떤 기준으로부터 얼마나 변화했는지를 의미한다.
+    - 재구매율, 재방문율 등으로 해석할 수 있다.
+    - **특정 기간의 그룹이 다음 행동을 어떻게 하는지 패턴을 알 수 있다**
+
+```python
+retention
+```
+![cohort_case_4_18.png](./images/cohort_case_4_18.png)
+
+### 8. 히트맵 함수
+- 히트맵 설정 함수
+
+```python
+def heatmap(data, row_labels, col_labels, ax=None,
+            cbar_kw={}, cbarlabel="", **kwargs) :
+
+    if not ax :
+        ax = plt.gca()
+
+    im = ax.imshow(data, **kwargs)
+
+    cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+    cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+    ax.set_xticks(np.arange(data.shape[1]))
+    ax.set_yticks(np.arange(data.shape[0]))
+
+    ax.set_xticklabels(col_labels)
+    ax.set_yticklabels(row_labels)
+
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+
+    plt.setp(ax.get_xticklabels(), rotation=-30, ha="right", rotation_mode="anchor")
+
+    ax.spines[:].set_visible(False)
+
+    #ax.set_xticks(np.arange(data.shape[1] + 1) - .5, minor=True)
+    #ax.set_yticks(np.arange(data.shape[0] + 1) - .5, minor=True)
+
+    ax.grid(which="minor", color="w", linestyle="", linewidth=2)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    ax.grid(False)
+
+    return im, cbar
+```
+
+- 히트맵의 문자를 설정하는 함수
+
+```python
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}", textcolors=("black", "white"),
+                    threshold=None, **textkw) :
+
+    if not isinstance(data, (list, np.ndarray)) :
+        data = im.get_array()
+
+    if threshold is not None :
+        threshold = im.norm(threshold)
+    else :
+        threshold = im.norm(data.max()) / 2
+
+    kw = dict(horizontalalignment="center", verticalalignment="center")
+    kw.update(textkw)
+
+    if isinstance(valfmt, str) :
+        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+    texts = []
+    for i in range(data.shape[0]) :
+        for j in range(data.shape[1]) :
+            kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+            text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+            texts.append(text)
+
+    return texts
+```
+
+### 8-1. 히트맵으로 나타내기
+
+```python
+fig, ax = plt.subplots(figsize=(9, 7))
+im, cbar = heatmap(retention, retention.index, retention.columns,
+                  ax=ax, cmap="YlGn", cbarlabel="% Retention")
+texts = annotate_heatmap(im, valfmt="{x:.2f}")
+fig.tight_layout()
+plt.show() ;
+```
+![cohort_case_4_19.png](./images/cohort_case_4_19.png)
 
 
+### 8-2. 주문수량에 대한 코호트 분석
+- 코호트 기간 별 평균 주문수량
+- retention matrix
 
+```python
+cc_q, retention_q = get_cohort_matrix(df22, var="Quantity", func=pd.Series.mean)
+retention_q
+```
+![cohort_case_4_20.png](./images/cohort_case_4_20.png)
 
+- heatmap
 
+```python
+fig, ax = plt.subplots(figsize=(9, 7))
+im, cbar = heatmap(cc_q, cc_q.index, cc_q.columns, ax=ax,
+                  cmap="Blues", cbarlabel="AVG Items")
+texts = annotate_heatmap(im, valfmt="{x:.2f}")
+fig.tight_layout()
+plt.show() ;
+```
+![cohort_case_4_21.png](./images/cohort_case_4_21.png)
 
+### 8-3. 판매금액에 대한 코호트 분석
+- retention matrix
 
+```python
+cc_sa, ret_sa = get_cohort_matrix(df22, var="Sales_Amount",
+                                 func=pd.Series.median)
 
+ret_sa				 
+```
+![cohort_case_4_22.png](./images/cohort_case_4_22.png)
 
+- heatmap
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```python
+fit, ax = plt.subplots(figsize=(9, 7))
+im, cbar = heatmap(cc_sa, cc_sa.index, cc_sa.columns, ax=ax,
+                  cmap="PRGn", cbarlabel="Median Sales Amount")
+text = annotate_heatmap(im, valfmt="{x:.2f}")
+fig.tight_layout()
+plt.show() ;
+```
+![cohort_case_4_23.png](./images/cohort_case_4_23.png)
 
