@@ -83,16 +83,17 @@ study &amp; summary about cohort analysis
 
 ### 8. 예측 또는 다양한 수치 분석을 통한 인사이트 추출
 - 예측 : 코호트 분석 기간 이후 패턴 예측
-- RFM : Recency, Frequency, MonetaryValue를 통한 고객 등급 구분 
-- KMeans : K-Means 그룹화하여 데이터 분석
+- RFMT : Recency, Frequency, MonetaryValue, Tenure를 수치를 통한 고객 등급 구분 
+- KMeans : K-Means 그룹화하여 군집별 특성 데이터 분석
 
 ### 요약
 - 데이터 임포트
-- OrderMonth
-- CohortMonth
-- 분석용 테이블 
-- CohortPeriod
-- Retention Matrix
-- 데이터 시각화 : plot, heatmap, snakeplot
-- 추가적인 수치 분석
+- 날짜 데이터 전처리
+    - 분석에 필요한 invoice 날짜 데이터 추출
+- 고객별 첫주문 날짜 데이터 생성 : cohortMonth
+- 고객별 첫주문 날짜와 개별 주문날짜의 차이 계산 : CohortPeriod
+- 첫주문 월 기준으로 그룹화한 후, 시간경과에 따른 비율 계산 : Retention Matrix
+- RFMT 분석
+- K-Means 클러스터링 분석
+- 데이터 시각화 : plot, heatmap, snakeplot(lineplot)
 
