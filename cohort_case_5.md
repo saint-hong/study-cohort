@@ -697,6 +697,7 @@ rfm_level_agg.sort_values(("MonetaryValue", "mean"), ascending=False)
 
 
 ### 5. 데이터 스케일링
+- k-means 클러스터링을 위한 데이터 스케일링
 
 #### 5-1. RFM 분포도
 
@@ -810,60 +811,302 @@ plt.show() ;
 ```
 ![cohort_case_5_30.png](./images/cohort_case_5_30.png)
 
-### 6. K-Means Clustering
+# K-Means Clustering
 - k-means clustering은 데이터의 확률변수가 대칭분포라고 가정한다.
     - 평균값과 분산이 동일하다고 가정한다.
-- 따라서 이에 맞게 데이터를 준비한다.
+    - 이를 위해 데이터를 StandardScaler를 통한 스케일링 함. (data_normalized)
+
+### 1. K-Means 분석
+- 5개의 클러스터 설정
 
 
+```python
+from sklearn.cluster import KMeans
+
+kmeans = KMeans(n_clusters=5, random_state=1)
+kmeans.fit(data_normalized)
+cluster_labels = kmeans.labels_
+```
+
+- 클러스터 라벨 확인 : 각 데이터별로 어떤 클러스터 그룹의 라벨로 구분되었는지 알 수 있다.
+
+```python
+cluster_labels[:20]
+
+>>> print
+
+array([3, 4, 2, 1, 3, 2, 3, 2, 3, 1, 4, 1, 4, 2, 3, 4, 2, 1, 3, 1])
+```
+
+#### 1-1. 클러스터라벨 컬럼 생성
+- Cluster 컬럼을 생성하고, 클러스터 라벨값을 넣어준다. 
+
+```python
+data_rfm_k5 = data_rfm.assign(Cluster=cluster_labels)
+data_rfm_k5
+```
+![cohort_case_5_31.png](./images/cohort_case_5_31.png)
+
+#### 1-2. 클러스터별로 값을 비교
+- 클러스터 라벨 기준으로 그룹화하여, RFM 데이터의 평균값을 구한다.
+- 2번째/5번째,  3번째/4번째 클러스터의 평균값이 유사하다.
+    - 즉 클러스터의 갯수를 5개로 하는 것이 맞는지에 대한 의문을 가질 수 있다.
+
+```python
+grouped = data_rfm_k5.groupby("Cluster")
+grouped.agg({
+    "Recency" : "mean",
+    "Frequency" : "mean",
+    "MonetaryValue" : ["mean", "count"]
+}).round(1)
+```
+![cohort_case_5_32.png](./images/cohort_case_5_32.png)
+
+### 2. search K : elbow method
+- 더 적합한 K값, 클러스터의 갯수 K를 찾기 위해 elbow 방법을 사용한다.
+- **WCSS : within clusters sum of squaes**
+- **kmeans.interia_** 명령어 : 가장 가까운 군집 중심까지의 거리 제곱의 합계값 반환
+    - 이 값을 그래프로 나타내면 특정한 x값에서 그래프가 크게 구부러지는 부분이 생긴다.
+    - 이 x값을 K 값으로 선택하는 것이 적당하다.
+    - 구부러지는지 원인에 대해서 찾아 볼 것.
+
+#### 2-1. 클러스터의 갯수별 WCSS 값을 비교
+
+```python
+sse = {}
+
+for k in range(1, 12) :
+    kmeans = KMeans(n_clusters=k, random_state=1)
+    kmeans.fit(data_normalized)
+    sse[k] = kmeans.inertia_
+
+sse
+
+>>> print
+
+{1: 13116.0,
+ 2: 7827.6634366786375,
+ 3: 6058.066879833661,
+ 4: 5057.941948130691,
+ 5: 4268.769123093076,
+ 6: 3722.9425664096116,
+ 7: 3187.219601343379,
+ 8: 2758.9401327186615,
+ 9: 2503.2829749838443,
+ 10: 2279.453508284804,
+ 11: 2070.8016224933435}
+```
+
+#### 2-2. plot으로 나타내기
+- 크게 구부러지는 지점으로 2, 3을 선택할 수 있다.
+    - 클러스터 갯수를 2개로 구분하는 것은 큰 의미가 없으므로 3을 선택
+
+```python
+plt.figure(figsize=(18, 9))
+sns.pointplot(x=list(sse.keys()), y=list(sse.values()))
+plt.title("The Elbow Metohd : K")
+plt.xlabel("k")
+plt.ylabel("SSE")
+plt.show() ;
+```
+![cohort_case_5_33.png](./images/cohort_case_5_33.png)
+
+### 3. K=3 일때 KMeans Clustering
+- K=5 일때 보다 각 클러스터별 RFM 평균값이 잘 구분이 된 것으로 보인다.
+
+```python
+kmeans = KMeans(n_clusters=3, random_state=1)
+kmeans.fit(data_normalized)
+cluster_labels = kmeans.labels_
+
+data_rfm_k3 = data_rfm.assign(Cluster=cluster_labels)
+grouped = data_rfm_k3.groupby("Cluster")
+grouped.agg({
+    "Recency" : "mean",
+    "Frequency" : "mean",
+    "MonetaryValue" : ["mean", "count"]
+}).round(1)
+```
+![cohort_case_5_34.png](./images/cohort_case_5_34.png)
+
+### 4. snake plot
+- 스네이크 플롯은 클러스터링의 세그먼트를 더 잘 이해하고 비교하는 방법 중 하나이다.
+    - 각각의 세그먼트의 속성을 시각적으로 나타내준다.
+    - 마케팅 분석에서 잘 사용된다.
+    - 클러스터간의 차이를 더 쉽게 확인 할 수 있다.
+    - **k-means로 고객 클러스터링 분석해보기** 페이지 : https://towardsdatascience.com/digital-tribes-customer-clustering-with-k-means-6db8580a7a60
+- pd.melt() - > snake plot
+- 데이터 프레임의 재 구조화
+- 컬럼명을 데이터 값으로 만들고 value 값에는 해당 컬럼의 값이 들어간다.
+    - 3개의 컬럼이면 각 컬럼의 순차적으로 일렬로 연결된다.
+    - 각 컬럼마다 원래 이 컬럼의 값이 value 컬럼에 들어간다.
+    - id_vars에 설정한 컬럼을 제외한 컬럼의 값들이 데이터가 된다.
+- snake plo 형태로 나타내면 k 집단별로 RFM 지표가 어떻게 다른지 쉽게 알 수 있다.
+    - **pd.melt()로 데이터를 재구조화하고 sns.lineplot() 으로 그린다.**
+
+#### 4-1. pd.melt()
+- id_vars 로 설정한 컬럼은 그대로 남는다.
+- id_vars 로 설정하지 않은 컬럼의 이름과 해당값이 열벡터로 재구조화 된다.
+- var_name="Metric" 컬럼에는 Recency, Frequency, MonetaryValue 가 순서데로 들어간다.
 
 
+#### 4-2. snakeplot()
+- metric 컬럼 기준으로 정렬 후 sns.lineplot()으로 나타낸다. 
+    - frequency, Monetary, recency
+- snake plot 이라는 이름은 그래프의 모양을 의미하는 것 같다.    
 
+```python
+data_melt.sort_values("Metric", inplace=True)
+data_melt.head()
+```
+![cohort_case_5_35.png](./images/cohort_case_5_35.png)
 
+- lineplot()
 
+```python
+plt.figure(figsize=(18, 9))
+sns.lineplot(data=data_melt, x="Metric", y="Value", hue="Cluster")
+m = data_rfm_k3.groupby("Cluster")["MonetaryValue"].mean().round(1)[2]
+plt.axhline(m, ls="--", lw=1.2, c='g')
+plt.xlabel("Metric")
+plt.ylabel("Value")
+plt.title("Snake plot of normalized variabels")
+plt.show() ;
+```
+![cohort_case_5_36.png](./images/cohort_case_5_36.png)
 
+### 5. RFM 별 상대적 중요도 계산
+- 각각의 클러스터별로 RFM value의 상대적 중요도를 계산한다.
+    - k-means 클러스터로 분류한 후의 평균값을 분류 전 원래 데이터의 평균으로 나누어 준다.
 
+#### 5-1. 클러스터링 데이터의 평균값
+- Custer 라벨 기준으로 그룹화 후 RFM 컬럼별 평균값 계산
 
+```python
+data_rfm_k3.groupby(["Cluster"]).mean()
+```
+![cohort_case_5_37.png](./images/cohort_case_5_37.png)
 
+#### 5-2. 클러스터링 전 RFM 별 평균값
 
+```python
+data_rfm.mean()
 
+>>> print
 
+Recency            92.047118
+Frequency          93.053522
+MonetaryValue    6187.093818
+dtype: float64
+```
 
+#### 5-3. 중요도 계산
+- 클러스터링 후 RFM 평균값을 클러스터링 전 RFM 별 평균값으로 나누어 준다. 
 
+```python
+cluster_avg = data_rfm_k3.groupby(["Cluster"]).mean()
+population_avg = data_rfm.mean()
+relative_imp = cluster_avg / population_avg - 1
+relative_imp.round(2)
+```
+![cohort_case_5_38.png](./images/cohort_case_5_38.png)
 
+### 6. Tenure 계산
+- 전체 주문 날짜에서 가장 최근 날짜 - 각 고객별 첫 주문 날짜
+    - Recency는 가장 최신 날짜 - 각 고객별 마지막 주문 날짜
+- **로그 스케일링한 RFM 데이터가 아닌, 스케일링 하기전의 RFM 데이터에 추가 해준다.**
 
+#### 6-1. 전체 데이터 중 가장 최근 주문일
 
+```python
+dff["InvoiceDate"].max()
 
+>>> print
 
+Timestamp('2011-12-09 12:50:00')
+```
 
+#### 6-2. 가장 최신 주문일과 고객별 첫 주문일자의 차이 
 
+```python
+tenure_list = []
+for i in list(data_rfm.index) :
+    tenure_list.append((dff["InvoiceDate"].max() -
+                       dff[dff["CustomerID"]==i]["InvoiceDate"].min()).days + 1)
+```
+![cohort_case_5_39.png](./images/cohort_case_5_39.png)
 
+### 7. RFM+Tenure 데이터 클러스터링
+- Recency, Frequency, MonetaryValue, Tenure 컬럼으로 클러스터링
 
+#### 7-1. 다시 로그 스케일링
+- T 컬럼이 추가 된 데이터 스케일링
 
+```python
+data_rfmt_log = np.log(data_rfmt)
 
+scaler = StandardScaler()
+scaler.fit(data_rfmt_log)
+data_rfmt_normalized = scaler.transform(data_rfmt_log)
 
+data_rfmt_normalized[:10]
 
+>>> print
 
+array([[ 1.40291653, -2.23027417, -0.69469155,  0.70016204],
+       [-2.07513467,  1.1334149 ,  1.216781  ,  0.83122724],
+       [ 0.39959276, -0.18646553,  0.26704753,  0.8037574 ],
+       [-0.53793558,  0.45219464,  0.24906856, -2.44464062],
+       [ 1.36855418, -0.63445476, -0.48837792,  0.64448402],
+       [-0.10156695,  0.6486216 ,  0.15092529,  0.59708707],
+       [ 1.08283178, -1.71340336, -0.63825118,  0.18152213],
+       [ 1.1706527 ,  0.28067439, -0.07782622,  0.32382017],
+       [ 1.11550824, -0.83449571, -0.4150679 ,  0.23446846],
+       [-0.40748162,  0.29342149,  0.69057683,  0.70016204]])
+```
 
+#### 7-2. K값에 대한 elbow 값 계산
 
+```python
+sse = {}
 
+for k in range(1, 11) :
+    kmeans = KMeans(n_clusters=k, random_state=1)
+    kmeans.fit(data_rfmt_normalized)
+    sse[k] = kmeans.inertia_
 
+plt.figure(figsize=(13, 8))
+sns.pointplot(x=list(sse.keys()), y=list(sse.values()))
+plt.title("The Elbow Method : RFMT", y=1.05, fontsize=15)
+plt.show() ;
+```
+![cohort_case_5_40.png](./images/cohort_case_5_40.png)
 
+#### 7-3. K=4로 클러스터링
+- 클러스터링 후 라벨값 확인
 
+```python
+kmeans = KMeans(n_clusters=4, random_state=1)
+kmeans.fit(data_rfmt_normalized)
+cluster_labels = kmeans.labels_
+cluster_labels[:15]
 
+>>> print
 
+array([1, 2, 1, 0, 1, 3, 1, 1, 1, 3, 0, 3, 2, 3, 1])
+```
 
+- 클러스터 기준으로 그룹화하고 각 피쳐별 평균값 계산
 
-
-
-
-
-
-
-
-
-
-
-
-
+```python
+data_rfmt_k4 = data_rfmt.assign(Cluster=cluster_labels)
+grouped = data_rfmt_k4.groupby("Cluster")
+grouped.agg({
+    "Recency" : "mean",
+    "Frequency" : "mean",
+    "MonetaryValue" : "mean",
+    "Tenure" : ["mean", "count"]
+}).round(2)
+```
+![cohort_case_5_41.png](./images/cohort_case_5_41.png)
 
