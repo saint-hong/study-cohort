@@ -14,7 +14,9 @@
 - 독립형 분석 프로젝트와 프로그래밍 방식의 비즈니스 인텔리전스 환경에서 사용하도록 설계되었다.
 - **베타 버전이라 버그가 있을 수 있다.**
     - 거시적인 그림을 그릴때 유용할 것 같다. 그러나 어느정도 정확도가 있는지는 확인 해봐야 할 것 같다.
-- `https://github.com/ESeufert/theseus_growth`
+
+### 참고 자료
+- https://github.com/ESeufert/theseus_growth
 
 ### 마케팅 용어 : Active User 활성사용자 
 - 어떤 행동을 활성사용자로 정의할 것인지는 정하기 나름
@@ -540,3 +542,4 @@ th.plot_forward_DAU_stacked(forward_DAU=combined_DAU,
                       for x in list(combined_DAU.columns)])
 ```
 ![theseus_19.png](./images/theseus_19.png)
+
