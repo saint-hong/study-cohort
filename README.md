@@ -1,5 +1,5 @@
 # study-cohort
-study &amp; summary about cohort analysis
+Description and Summary of the Marketing
 
 # 코호트 분석 cohort analysis
 - 특정 기간동안 공통된 특성이나 경험을 갖는 사용자 집단을 분석하는 방법
